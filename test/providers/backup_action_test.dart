@@ -55,7 +55,7 @@ void main() {
 
   group('consumeBackup owns the archive it produced', () {
     File stubArchive() {
-      final directory = Directory.systemTemp.createTempSync('flclash_backup');
+      final directory = Directory.systemTemp.createTempSync('veil_backup');
       addTearDown(() => directory.deleteSync(recursive: true));
       final file = File('${directory.path}/backup.zip')
         ..writeAsBytesSync(const [80, 75, 5, 6]);

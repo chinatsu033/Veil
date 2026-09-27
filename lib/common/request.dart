@@ -32,7 +32,7 @@ class Request {
           if (read == null) {
             return 'DIRECT';
           }
-          return FlClashHttpOverrides.findProxyForReader(read, uri);
+          return VeilHttpOverrides.findProxyForReader(read, uri);
         };
         return client;
       },

@@ -66,7 +66,7 @@ const _lightScheme = ColorScheme.light(
   outlineVariant: Color(0xFFDDE2EC),
 );
 
-/// Pure greys (zero saturation) so FlClash's own pages carry no colour cast.
+/// Pure greys (zero saturation) so Veil's own pages carry no colour cast.
 const _darkScheme = ColorScheme.dark(
   primary: Color(0xFFE6E6E6),
   onPrimary: Color(0xFF141414),

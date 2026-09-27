@@ -3,10 +3,10 @@ import 'package:fl_clash/models/changelog.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 String _body(String payload) =>
-    '<!-- flclash:changelog:begin -->\n'
+    '<!-- veil:changelog:begin -->\n'
     '### Features\n'
     '- Override scripts\n'
-    '<!-- flclash:changelog:end -->\n'
+    '<!-- veil:changelog:end -->\n'
     '\n'
     '$releaseChangelogJsonMarker\n'
     '$payload\n'

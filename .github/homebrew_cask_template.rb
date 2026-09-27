@@ -1,4 +1,4 @@
-cask "flclash" do
+cask "veil" do
   version "VERSION"
 
   on_macos do
@@ -7,12 +7,12 @@ cask "flclash" do
     sha256 arm:   "ARM_SHA256",
            intel: "AMD_SHA256"
 
-    url "https://github.com/chen08209/FlClash/releases/download/v#{version}/FlClash-#{version}-macos-#{arch}.dmg"
+    url "https://github.com/chinatsu033/Veil/releases/download/v#{version}/Veil-#{version}-macos-#{arch}.dmg"
   end
 
-  name "FlClash"
+  name "Veil"
   desc "Multi-platform proxy client based on ClashMeta"
-  homepage "https://github.com/chen08209/FlClash"
+  homepage "https://github.com/chinatsu033/Veil"
 
   livecheck do
     url :url
@@ -21,11 +21,11 @@ cask "flclash" do
 
   depends_on :macos
 
-  app "FlClash.app"
+  app "Veil.app"
 
   postflight do
     system_command "xattr",
-                   args: ["-rd", "com.apple.quarantine", "#{appdir}/FlClash.app"]
+                   args: ["-rd", "com.apple.quarantine", "#{appdir}/Veil.app"]
   end
 
   uninstall quit: "com.follow.clash"

@@ -223,7 +223,7 @@ abstract class GlassBackend {
   void setTun(bool value);
 }
 
-/// Bridges glass UI intents onto FlClash's existing actions.
+/// Bridges glass UI intents onto Veil's existing actions.
 class RealGlassBackend implements GlassBackend {
   RealGlassBackend(this.ref);
 

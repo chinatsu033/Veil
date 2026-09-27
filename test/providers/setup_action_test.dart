@@ -613,7 +613,7 @@ void main() {
           return '';
         });
         globalState.packageInfo = PackageInfo(
-          appName: 'FlClash',
+          appName: 'Veil',
           packageName: 'com.follow.clash',
           version: '0.0.0',
           buildNumber: '0',

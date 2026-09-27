@@ -33,7 +33,7 @@ void main(List<String> args) {
         final version = await system.init();
         await GlassPrefs.load();
         final container = await bootstrap.init(version);
-        HttpOverrides.global = FlClashHttpOverrides(container);
+        HttpOverrides.global = VeilHttpOverrides(container);
         request.attach(container.read);
         runApp(
           UncontrolledProviderScope(
