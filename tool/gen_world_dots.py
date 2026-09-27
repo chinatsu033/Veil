@@ -39,7 +39,7 @@ for r in range(ROWS):
 print(count, len(codes))
 b64 = base64.b64encode(bytes(out)).decode()
 lines = [b64[i:i+76] for i in range(0, len(b64), 76)]
-with open('/workspace/flclash/lib/glass/world_dots.dart', 'w') as f:
+with open('/workspace/veil/lib/glass/world_dots.dart', 'w') as f:
     f.write('// Generated from Natural Earth 1:50m admin-0 (public domain) by tool/gen_world_dots.py.\n')
     f.write('// Each dot is 3 bytes: column, row, index into worldDotCodes.\n\n')
     f.write(f'const worldDotStep = {STEP};\nconst worldDotLon0 = {LON0};\nconst worldDotLat0 = {LAT0};\n')

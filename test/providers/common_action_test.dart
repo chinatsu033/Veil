@@ -26,7 +26,7 @@ void main() {
   setUpAll(() {
     core = MockCoreHandlerInterface();
     globalState.packageInfo = PackageInfo(
-      appName: 'FlClash',
+      appName: 'Veil',
       packageName: 'com.follow.clash',
       version: runningVersion,
       buildNumber: '1',

@@ -671,7 +671,7 @@ class _OptionGroup extends StatelessWidget {
   }
 }
 
-/// Settings: big cards for TUN, outbound mode and profiles, then the FlClash tools.
+/// Settings: big cards for TUN, outbound mode and profiles, then the Veil tools.
 class GlassSettingsBody extends ConsumerWidget {
   const GlassSettingsBody({
     super.key,
