@@ -8,9 +8,9 @@
 
 > [!NOTE]
 > **Veil 是 [FlClash](https://github.com/chen08209/FlClash)（作者 chen08209）的修改版本**，由 [chinatsu033](https://github.com/chinatsu033/Veil) 维护。
-> 它保留了 FlClash 的核心与服务逻辑，把主界面换成了「液态玻璃」风格：Windows 和 macOS 上是紧凑的迷你小组件窗口，Android 上是竖屏地图布局，节点在点阵世界地图上按地区分组显示。支持浅色（默认）和中性深色外观，并可在设置中切换两款应用图标。
+> 它保留了 FlClash 的核心与服务逻辑，把主界面换成了「液态玻璃」风格：Windows、macOS 和 Linux 上是紧凑的迷你小组件窗口，Android 上是竖屏地图布局，节点在点阵世界地图上按地区分组显示。支持浅色（默认）和中性深色外观，并可在设置中切换两款应用图标。
 > 本项目与原项目一样采用 **GNU 通用公共许可证 v3.0（GPL-3.0）** 授权（见 [LICENSE](LICENSE)），并保留了上游的版权与许可声明。
-> Android 包名为 `com.chinatsu.veil`。Windows 版使用独立的安装目录、安装程序 ID、数据目录（`%APPDATA%\com.chinatsu\veil`）、核心/服务名称和端口，可与原版 FlClash 同时安装。macOS 版的 Bundle ID 为 `com.chinatsu.veil`（提供 Intel 与 Apple 芯片两个版本，未签名，首次打开方法见发布说明）。
+> Android 包名为 `com.chinatsu.veil`。Windows 版使用独立的安装目录、安装程序 ID、数据目录（`%APPDATA%\com.chinatsu\veil`）、核心/服务名称和端口，可与原版 FlClash 同时安装。macOS 版的 Bundle ID 为 `com.chinatsu.veil`（提供 Intel `x86` 与 Apple 芯片 `arm64` 两个版本，未签名，首次打开方法见发布说明）。Linux 版（`x86` 与 `arm64`）提供 `.deb`、`.rpm` 和 `.AppImage`，应用 ID 为 `com.chinatsu.veil`。发布文件中 Intel/AMD 架构统一命名为 `x86`。
 > Veil 的问题请不要反馈给上游 FlClash。
 
 ## 许可与致谢
@@ -55,7 +55,9 @@
 
 ### Linux
 
-⚠️ 使用前请确保安装以下依赖
+`.deb` 用 `sudo apt install ./Veil-<版本>-linux-x86.deb` 安装（ARM 设备选 `linux-arm64`）；`.AppImage` 先 `chmod +x` 再直接运行。
+
+⚠️ 使用 AppImage 前请确保系统已安装托盘依赖
 
    ```bash
     sudo apt-get install libayatana-appindicator3-dev

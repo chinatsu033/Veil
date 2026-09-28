@@ -8,9 +8,9 @@
 
 > [!NOTE]
 > **Veil is a modified version of [FlClash](https://github.com/chen08209/FlClash)** by chen08209, maintained by [chinatsu033](https://github.com/chinatsu033/Veil).
-> It keeps FlClash's core and service logic and swaps the home screen for a "liquid glass" UI: a compact mini-widget window on Windows and macOS and a portrait map layout on Android, with nodes grouped by region on a dot-matrix world map. It has a light (default) and a neutral dark appearance, and two app icons you can switch between in Settings.
+> It keeps FlClash's core and service logic and swaps the home screen for a "liquid glass" UI: a compact mini-widget window on Windows, macOS and Linux and a portrait map layout on Android, with nodes grouped by region on a dot-matrix world map. It has a light (default) and a neutral dark appearance, and two app icons you can switch between in Settings.
 > Like the original, it is licensed under the **GNU General Public License v3.0** (see [LICENSE](LICENSE)); the upstream copyright and license notices are kept.
-> The Android package name is `com.chinatsu.veil`. On Windows it uses its own install folder, installer ID, data folder (`%APPDATA%\com.chinatsu\veil`), core/helper names and helper port, so it can be installed alongside the original FlClash. The macOS build (Intel and Apple silicon, unsigned; see the release notes for how to open it) uses the bundle ID `com.chinatsu.veil`.
+> The Android package name is `com.chinatsu.veil`. On Windows it uses its own install folder, installer ID, data folder (`%APPDATA%\com.chinatsu\veil`), core/helper names and helper port, so it can be installed alongside the original FlClash. The macOS build (Intel `x86` and Apple silicon `arm64`, unsigned; see the release notes for how to open it) uses the bundle ID `com.chinatsu.veil`. Linux builds (`x86` and `arm64`) come as `.deb`, `.rpm` and `.AppImage` with the app ID `com.chinatsu.veil`. Release files name the Intel/AMD architecture `x86`.
 > Please don't report problems with Veil to upstream FlClash.
 
 ## Licenses & credits
@@ -55,7 +55,9 @@ A multi-platform proxy client based on ClashMeta, simple and easy to use, open-s
 
 ### Linux
 
-⚠️ Make sure to install the following dependencies before using them
+Install the `.deb` with `sudo apt install ./Veil-<version>-linux-x86.deb` (use `linux-arm64` on ARM), or make the `.AppImage` executable with `chmod +x` and run it.
+
+⚠️ The AppImage needs the tray library installed on the system
 
    ```bash
     sudo apt-get install libayatana-appindicator3-dev

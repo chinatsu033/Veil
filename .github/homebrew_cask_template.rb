@@ -2,7 +2,7 @@ cask "veil" do
   version "VERSION"
 
   on_macos do
-    arch arm: "arm64", intel: "amd64"
+    arch arm: "arm64", intel: "x86"
 
     sha256 arm:   "ARM_SHA256",
            intel: "AMD_SHA256"
