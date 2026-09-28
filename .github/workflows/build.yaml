@@ -2,6 +2,10 @@ name: build
 
 on:
   workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Platforms to build (comma separated: android,windows,macos)'
+        default: 'android,windows,macos'
   push:
     tags:
       - 'v*'
@@ -16,17 +20,34 @@ env:
   NDK_VERSION: r28c
 
 jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      include: ${{ steps.select.outputs.include }}
+    steps:
+      - name: Select platforms
+        id: select
+        env:
+          PLATFORMS: ${{ github.event.inputs.platforms || 'android,windows,macos' }}
+        run: |
+          all='[
+            {"platform":"android","os":"ubuntu-latest"},
+            {"platform":"windows","os":"windows-2022","arch":"amd64"},
+            {"platform":"macos","os":"macos-15-intel","arch":"amd64"},
+            {"platform":"macos","os":"macos-15","arch":"arm64"}
+          ]'
+          include="$(jq -c --arg p "$PLATFORMS" \
+            '($p | gsub(" "; "") | split(",")) as $w | map(select(.platform as $x | $w | index($x)))' <<<"$all")"
+          test "$include" != '[]' || { echo "No platform matches '$PLATFORMS'" >&2; exit 1; }
+          echo "include=$include" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: [ matrix ]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - platform: android
-            os: ubuntu-latest
-          - platform: windows
-            os: windows-2022
-            arch: amd64
+        include: ${{ fromJSON(needs.matrix.outputs.include) }}
 
     steps:
       - name: Checkout
@@ -92,6 +113,14 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
+      - name: Setup Xcode
+        if: matrix.platform == 'macos'
+        run: |
+          xcode="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -v -i beta | sort -V | tail -n 1)"
+          test -n "$xcode" || xcode="$(ls -d /Applications/Xcode_*.app | grep -v -i beta | sort -V | tail -n 1)"
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+
       - name: Setup NDK
         if: matrix.platform == 'android'
         uses: nttld/setup-ndk@v1
@@ -110,6 +139,22 @@ jobs:
         env:
           ANDROID_NDK_HOME: ${{ steps.build-ndk.outputs.ndk-path }}
         run: dart setup.dart ${{ matrix.platform }} --env stable -v
+
+      - name: Verify macOS bundle
+        if: matrix.platform == 'macos'
+        run: |
+          app="build/macos/Build/Products/Release/Veil.app"
+          want=$([ "${{ matrix.arch }}" = arm64 ] && echo arm64 || echo x86_64)
+          for bin in "$app/Contents/MacOS/Veil" "$app/Contents/MacOS/VeilCore"; do
+            archs="$(lipo -archs "$bin")"
+            echo "$bin: $archs"
+            test "$archs" = "$want"
+          done
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' -c 'Print :CFBundleName' \
+            -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv "$app" 2>&1 | grep -E 'Signature|Identifier'
+          ls -la dist
 
       - name: Upload
         uses: actions/upload-artifact@v4
