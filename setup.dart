@@ -369,10 +369,12 @@ Future<int> _ensureLinuxDependencies() async {
   return 0;
 }
 
-/// flutter_distributor hardcodes `ARCH=x86_64`, wrong for arm64 AppImages.
+/// flutter_distributor hardcodes `ARCH=x86_64`, wrong for arm64 AppImages;
+/// this appimagetool only accepts `arm_aarch64` for the latter.
 String appImageToolWrapper(String tool, String arch) {
+  final archName = arch == 'aarch64' ? 'arm_aarch64' : arch;
   return '#!/bin/sh\n'
-      'export ARCH=$arch APPIMAGE_EXTRACT_AND_RUN=1\n'
+      'export ARCH=$archName APPIMAGE_EXTRACT_AND_RUN=1\n'
       'exec "$tool" "\$@"\n';
 }
 

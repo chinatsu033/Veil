@@ -95,7 +95,11 @@ hooks:
     test('appimagetool wrapper pins the host architecture', () {
       final script = setup.appImageToolWrapper('/opt/tool', 'aarch64');
 
-      expect(script, contains('ARCH=aarch64'));
+      expect(script, contains('ARCH=arm_aarch64 '));
+      expect(
+        setup.appImageToolWrapper('/opt/tool', 'x86_64'),
+        contains('ARCH=x86_64 '),
+      );
       expect(script, contains('APPIMAGE_EXTRACT_AND_RUN=1'));
       expect(script, contains('exec "/opt/tool" "\$@"'));
     });

@@ -173,6 +173,8 @@ jobs:
           ls -la dist
           want=$([ "${{ matrix.arch }}" = arm64 ] && echo aarch64 || echo x86-64)
           file build/linux/*/release/bundle/Veil | tee /dev/stderr | grep -q "$want"
+          foreign="$(find build/linux/*/release/bundle -type f -exec file {} + | grep ELF | grep -v "$want" || true)"
+          test -z "$foreign" || { echo "Foreign-arch ELF files in bundle:" >&2; echo "$foreign" >&2; exit 1; }
           deb="$(ls dist/*.deb)"
           dpkg-deb --info "$deb"
           dpkg-deb --contents "$deb" | grep -E 'usr/share/applications/|opt/Veil/Veil$'
