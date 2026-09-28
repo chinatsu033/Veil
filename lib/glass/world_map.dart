@@ -71,12 +71,76 @@ class _WorldDotMapState extends State<WorldDotMap>
   late final AnimationController _pulse = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 2400),
-  )..repeat();
+  );
+  ui.Image? _dots;
+  _DotsKey? _dotsKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncPulse();
+  }
+
+  @override
+  void didUpdateWidget(covariant WorldDotMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncPulse();
+  }
 
   @override
   void dispose() {
     _pulse.dispose();
+    _dots?.dispose();
     super.dispose();
+  }
+
+  RegionKey? get _pulsing {
+    final selected = widget.selected;
+    if (selected == null) return null;
+    return widget.markers.any((m) => m.key == selected) ? selected : null;
+  }
+
+  void _syncPulse() {
+    if (_pulsing == null) {
+      if (_pulse.isAnimating) _pulse.stop();
+    } else if (!_pulse.isAnimating) {
+      _pulse.repeat();
+    }
+  }
+
+  // The dot matrix is thousands of points with blurred glows; drawing it every
+  // pulse frame kept the raster thread busy. It is rasterised once per input
+  // change and only the rings are animated.
+  ui.Image _dotsFor(Size size, double pixelRatio) {
+    final key = _DotsKey(
+      size: size,
+      pixelRatio: pixelRatio,
+      markers: widget.markers,
+      selected: widget.selected,
+      dark: glassDark,
+    );
+    final cached = _dots;
+    if (cached != null && key == _dotsKey) return cached;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder)..scale(pixelRatio);
+    _paintDots(
+      canvas,
+      _mapRect(size),
+      markers: widget.markers,
+      selected: widget.selected,
+    );
+    final picture = recorder.endRecording();
+    final image = picture.toImageSync(
+      math.max(1, (size.width * pixelRatio).ceil()),
+      math.max(1, (size.height * pixelRatio).ceil()),
+    );
+    picture.dispose();
+    if (cached != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => cached.dispose());
+    }
+    _dots = image;
+    _dotsKey = key;
+    return image;
   }
 
   Rect _mapRect(Size size) {
@@ -140,29 +204,89 @@ class _WorldDotMapState extends State<WorldDotMap>
 
   @override
   Widget build(BuildContext context) {
+    final pixelRatio = MediaQuery.devicePixelRatioOf(context);
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = constraints.biggest;
+        final pulsing = _pulsing;
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTapUp: widget.interactive
               ? (d) => _handleTap(d.localPosition, size)
               : null,
-          child: RepaintBoundary(
-            child: CustomPaint(
-              size: size,
-              painter: _WorldMapPainter(
-                markers: widget.markers,
-                selected: widget.selected,
-                pulse: _pulse,
-                rectFor: _mapRect,
+          child: Stack(
+            children: [
+              RepaintBoundary(
+                child: CustomPaint(
+                  size: size,
+                  painter: _ImagePainter(
+                    _dotsFor(size, pixelRatio),
+                    pixelRatio,
+                  ),
+                ),
               ),
-            ),
+              if (pulsing != null)
+                RepaintBoundary(
+                  child: CustomPaint(
+                    size: size,
+                    painter: _PulsePainter(
+                      center: projectLatLon(
+                        _mapRect(size),
+                        pulsing.lat,
+                        pulsing.lon,
+                      ),
+                      base: math.max(
+                        2.6,
+                        _mapRect(size).width / worldDotCols * 1.05,
+                      ),
+                      pulse: _pulse,
+                      dark: glassDark,
+                    ),
+                  ),
+                ),
+            ],
           ),
         );
       },
     );
   }
+}
+
+class _DotsKey {
+  const _DotsKey({
+    required this.size,
+    required this.pixelRatio,
+    required this.markers,
+    required this.selected,
+    required this.dark,
+  });
+
+  final Size size;
+  final double pixelRatio;
+  final List<WorldMapMarker> markers;
+  final RegionKey? selected;
+  final bool dark;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _DotsKey &&
+      other.size == size &&
+      other.pixelRatio == pixelRatio &&
+      other.selected == selected &&
+      other.dark == dark &&
+      _sameMarkers(other.markers, markers);
+
+  @override
+  int get hashCode => Object.hash(size, pixelRatio, selected, dark);
+}
+
+bool _sameMarkers(List<WorldMapMarker> a, List<WorldMapMarker> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i].key != b[i].key || a[i].count != b[i].count) return false;
+  }
+  return true;
 }
 
 Offset projectLatLon(Rect rect, double lat, double lon) {
@@ -181,137 +305,165 @@ Offset _dotOffset(Rect rect, int col, int row) {
   return projectLatLon(rect, lat, lon);
 }
 
-class _WorldMapPainter extends CustomPainter {
-  _WorldMapPainter({
-    required this.markers,
-    required this.selected,
-    required this.pulse,
-    required this.rectFor,
-  }) : super(repaint: pulse);
+void _paintDots(
+  Canvas canvas,
+  Rect rect, {
+  required List<WorldMapMarker> markers,
+  required RegionKey? selected,
+}) {
+  final grid = _DotGrid.instance;
+  final cell = rect.width / worldDotCols;
+  final supported = {for (final m in markers) m.key.country};
+  final selectedCountry = selected?.country;
+  final dim = <Offset>[];
+  final lit = <Offset>[];
+  final hot = <Offset>[];
+  for (var i = 0; i < grid.length; i++) {
+    final code = worldDotCodes[grid.codes[i]];
+    final p = _dotOffset(rect, grid.cols[i], grid.rows[i]);
+    if (code == selectedCountry) {
+      hot.add(p);
+    } else if (supported.contains(code)) {
+      lit.add(p);
+    } else {
+      dim.add(p);
+    }
+  }
+  final dotSize = math.max(1.4, cell * 0.52);
+  Paint dots(Color color, double strokeWidth, [double blur = 0]) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    if (blur > 0) {
+      paint.maskFilter = MaskFilter.blur(BlurStyle.normal, blur);
+    }
+    return paint;
+  }
 
-  final List<WorldMapMarker> markers;
-  final RegionKey? selected;
-  final Animation<double> pulse;
-  final Rect Function(Size size) rectFor;
-  final bool dark = glassDark;
+  canvas.drawPoints(
+    ui.PointMode.points,
+    dim,
+    dots(GlassColors.ink.withValues(alpha: glassDark ? 0.14 : 0.2), dotSize),
+  );
+  if (lit.isNotEmpty) {
+    canvas.drawPoints(
+      ui.PointMode.points,
+      lit,
+      dots(
+        GlassColors.glow.withValues(alpha: glassDark ? 0.3 : 0.55),
+        dotSize * 2.4,
+        dotSize * 1.3,
+      ),
+    );
+    canvas.drawPoints(
+      ui.PointMode.points,
+      lit,
+      dots(Colors.white, dotSize * 1.05),
+    );
+  }
+  if (hot.isNotEmpty) {
+    canvas.drawPoints(
+      ui.PointMode.points,
+      hot,
+      dots(
+        GlassColors.accent.withValues(alpha: 0.6),
+        dotSize * 2.8,
+        dotSize * 1.6,
+      ),
+    );
+    canvas.drawPoints(
+      ui.PointMode.points,
+      hot,
+      dots(Colors.white, dotSize * 1.05),
+    );
+  }
+
+  for (final marker in markers) {
+    final isSelected = marker.key == selected;
+    final p = projectLatLon(rect, marker.key.lat, marker.key.lon);
+    final base = math.max(2.6, cell * (isSelected ? 1.05 : 0.8));
+    canvas.drawCircle(
+      p,
+      base * 3.2,
+      Paint()
+        ..color = (isSelected ? GlassColors.accent : GlassColors.glow)
+            .withValues(
+              alpha: glassDark
+                  ? (isSelected ? 0.55 : 0.4)
+                  : (isSelected ? 0.7 : 0.75),
+            )
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, base * 2.2),
+    );
+    canvas.drawCircle(p, base, Paint()..color = Colors.white);
+    canvas.drawCircle(
+      p,
+      base + 0.6,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = (isSelected ? GlassColors.accent : GlassColors.glow)
+            .withValues(alpha: 0.9),
+    );
+  }
+}
+
+class _ImagePainter extends CustomPainter {
+  _ImagePainter(this.image, this.pixelRatio);
+
+  final ui.Image image;
+  final double pixelRatio;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = rectFor(size);
-    final grid = _DotGrid.instance;
-    final cell = rect.width / worldDotCols;
-    final supported = {for (final m in markers) m.key.country};
-    final selectedCountry = selected?.country;
-    final dim = <Offset>[];
-    final lit = <Offset>[];
-    final hot = <Offset>[];
-    for (var i = 0; i < grid.length; i++) {
-      final code = worldDotCodes[grid.codes[i]];
-      final p = _dotOffset(rect, grid.cols[i], grid.rows[i]);
-      if (code == selectedCountry) {
-        hot.add(p);
-      } else if (supported.contains(code)) {
-        lit.add(p);
-      } else {
-        dim.add(p);
-      }
-    }
-    final dotSize = math.max(1.4, cell * 0.52);
-    Paint dots(Color color, double strokeWidth, [double blur = 0]) {
-      final paint = Paint()
-        ..color = color
-        ..strokeWidth = strokeWidth
-        ..strokeCap = StrokeCap.round;
-      if (blur > 0) {
-        paint.maskFilter = MaskFilter.blur(BlurStyle.normal, blur);
-      }
-      return paint;
-    }
-
-    canvas.drawPoints(
-      ui.PointMode.points,
-      dim,
-      dots(GlassColors.ink.withValues(alpha: glassDark ? 0.14 : 0.2), dotSize),
+    canvas.save();
+    canvas.scale(1 / pixelRatio);
+    canvas.drawImage(
+      image,
+      Offset.zero,
+      Paint()..filterQuality = FilterQuality.low,
     );
-    if (lit.isNotEmpty) {
-      canvas.drawPoints(
-        ui.PointMode.points,
-        lit,
-        dots(
-          GlassColors.glow.withValues(alpha: glassDark ? 0.3 : 0.55),
-          dotSize * 2.4,
-          dotSize * 1.3,
-        ),
-      );
-      canvas.drawPoints(
-        ui.PointMode.points,
-        lit,
-        dots(Colors.white, dotSize * 1.05),
-      );
-    }
-    if (hot.isNotEmpty) {
-      canvas.drawPoints(
-        ui.PointMode.points,
-        hot,
-        dots(
-          GlassColors.accent.withValues(alpha: 0.6),
-          dotSize * 2.8,
-          dotSize * 1.6,
-        ),
-      );
-      canvas.drawPoints(
-        ui.PointMode.points,
-        hot,
-        dots(Colors.white, dotSize * 1.05),
-      );
-    }
+    canvas.restore();
+  }
 
+  @override
+  bool shouldRepaint(_ImagePainter oldDelegate) =>
+      !identical(oldDelegate.image, image) ||
+      oldDelegate.pixelRatio != pixelRatio;
+}
+
+class _PulsePainter extends CustomPainter {
+  _PulsePainter({
+    required this.center,
+    required this.base,
+    required this.pulse,
+    required this.dark,
+  }) : super(repaint: pulse);
+
+  final Offset center;
+  final double base;
+  final Animation<double> pulse;
+  final bool dark;
+
+  @override
+  void paint(Canvas canvas, Size size) {
     final t = pulse.value;
-    for (final marker in markers) {
-      final isSelected = marker.key == selected;
-      final p = projectLatLon(rect, marker.key.lat, marker.key.lon);
-      final base = math.max(2.6, cell * (isSelected ? 1.05 : 0.8));
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.3;
+    for (final phase in [0.0, 0.5]) {
+      final k = (t + phase) % 1.0;
       canvas.drawCircle(
-        p,
-        base * 3.2,
-        Paint()
-          ..color = (isSelected ? GlassColors.accent : GlassColors.glow)
-              .withValues(
-                alpha: glassDark
-                    ? (isSelected ? 0.55 : 0.4)
-                    : (isSelected ? 0.7 : 0.75),
-              )
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, base * 2.2),
+        center,
+        base * (1.6 + k * 5.5),
+        paint..color = GlassColors.accent.withValues(alpha: (1 - k) * 0.6),
       );
-      canvas.drawCircle(p, base, Paint()..color = Colors.white);
-      canvas.drawCircle(
-        p,
-        base + 0.6,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1
-          ..color = (isSelected ? GlassColors.accent : GlassColors.glow)
-              .withValues(alpha: 0.9),
-      );
-      if (isSelected) {
-        for (final phase in [0.0, 0.5]) {
-          final k = (t + phase) % 1.0;
-          canvas.drawCircle(
-            p,
-            base * (1.6 + k * 5.5),
-            Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 1.3
-              ..color = GlassColors.accent.withValues(alpha: (1 - k) * 0.6),
-          );
-        }
-      }
     }
   }
 
   @override
-  bool shouldRepaint(_WorldMapPainter oldDelegate) =>
-      oldDelegate.markers != markers ||
-      oldDelegate.selected != selected ||
+  bool shouldRepaint(_PulsePainter oldDelegate) =>
+      oldDelegate.center != center ||
+      oldDelegate.base != base ||
       oldDelegate.dark != dark;
 }

@@ -870,51 +870,54 @@ class GlassSettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final strings = GlassStrings.of(context);
     final top = MediaQuery.paddingOf(context).top;
-    return Scaffold(
-      backgroundColor: GlassColors.bgBottom,
-      body: GlassBackground(
-        child: Column(
-          children: [
-            SizedBox(height: top + 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  GlassButton(
-                    onTap: () => Navigator.of(context).maybePop(),
-                    width: 44,
-                    height: 44,
-                    radius: 14,
-                    child: Icon(
-                      Icons.arrow_back_rounded,
-                      color: GlassColors.text,
-                      size: 22,
+    return GlassBlurScope(
+      enabled: false,
+      child: Scaffold(
+        backgroundColor: GlassColors.bgBottom,
+        body: GlassBackground(
+          child: Column(
+            children: [
+              SizedBox(height: top + 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    GlassButton(
+                      onTap: () => Navigator.of(context).maybePop(),
+                      width: 44,
+                      height: 44,
+                      radius: 14,
+                      child: Icon(
+                        Icons.arrow_back_rounded,
+                        color: GlassColors.text,
+                        size: 22,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 14),
-                  Text(
-                    strings.settings,
-                    style: TextStyle(
-                      color: GlassColors.text,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
+                    const SizedBox(width: 14),
+                    Text(
+                      strings.settings,
+                      style: TextStyle(
+                        color: GlassColors.text,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: GlassSettingsBody(
-                initialOffset: initialOffset,
-                padding: EdgeInsets.fromLTRB(
-                  16,
-                  16,
-                  16,
-                  16 + MediaQuery.paddingOf(context).bottom,
+                  ],
                 ),
               ),
-            ),
-          ],
+              Expanded(
+                child: GlassSettingsBody(
+                  initialOffset: initialOffset,
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    16,
+                    16,
+                    16 + MediaQuery.paddingOf(context).bottom,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

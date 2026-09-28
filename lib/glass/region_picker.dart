@@ -326,6 +326,27 @@ class GlassIconButton extends StatelessWidget {
   }
 }
 
+/// Watches traffic itself so a speed tick does not rebuild the whole home.
+class LiveSpeedBar extends ConsumerWidget {
+  const LiveSpeedBar({super.key, this.height = 52, this.fontSize = 17});
+
+  final double height;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final speed = ref.watch(glassSpeedProvider);
+    return RepaintBoundary(
+      child: SpeedBar(
+        up: speed.up,
+        down: speed.down,
+        height: height,
+        fontSize: fontSize,
+      ),
+    );
+  }
+}
+
 /// Large start/stop control with a play triangle that morphs to pause.
 class GlassPlayButton extends ConsumerStatefulWidget {
   const GlassPlayButton({

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui' as ui;
 
 import 'package:flutter_acrylic/flutter_acrylic.dart' as acrylic;
 import 'package:material_ui/material_ui.dart';
@@ -23,28 +22,48 @@ bool glassDemoMode = false;
 /// Forces the Android layout decisions (used by the harness on desktop hosts).
 bool glassMobileLayout = false;
 
-enum GlassWindowMaterial { transparent, none }
+/// [backdrop]: the OS blurs behind the window (Windows 11, macOS) under a light
+/// scrim; [transparent]: no blur, denser scrim; [opaque]: Linux, solid panel.
+enum GlassWindowMaterial { backdrop, transparent, opaque }
 
 class GlassWindow {
   GlassWindow._();
 
-  static GlassWindowMaterial material = GlassWindowMaterial.none;
+  static GlassWindowMaterial material = GlassWindowMaterial.opaque;
   static final ValueNotifier<bool> alwaysOnTop = ValueNotifier(false);
+
+  static final ValueNotifier<double> frameHeight = ValueNotifier(
+    glassWidgetHeight,
+  );
+  static const frameDuration = Duration(milliseconds: 240);
+  static const _contentFade = Duration(milliseconds: 160);
   static double _height = glassWidgetHeight;
   static double _desired = glassWidgetHeight;
   static int _overlays = 0;
   static int _resizeToken = 0;
   static const _overlayMinHeight = 560.0;
+  static bool _windowsBackdrop = false;
+
+  static GlassWindowMaterial get effectiveMaterial =>
+      glassDemoMode ? GlassWindowMaterial.transparent : material;
+
+  static bool get animatesFrame =>
+      effectiveMaterial == GlassWindowMaterial.transparent;
+
+  static double get frameRadius => _windowsBackdrop ? 0 : 26;
+
+  static double get scrimOpacity =>
+      effectiveMaterial == GlassWindowMaterial.backdrop ? 0.72 : 0.86;
 
   static void overlayPushed() {
     _overlays++;
-    if (_height < _overlayMinHeight) unawaited(_animateTo(_overlayMinHeight));
+    if (_height < _overlayMinHeight) unawaited(_resizeTo(_overlayMinHeight));
   }
 
   static void overlayPopped() {
     if (_overlays == 0) return;
     _overlays--;
-    if (_overlays == 0) unawaited(_animateTo(_desired));
+    if (_overlays == 0) unawaited(_resizeTo(_desired));
   }
 
   static Future<void> init() async {
@@ -63,29 +82,12 @@ class GlassWindow {
       );
     } catch (_) {}
     if (Platform.isWindows) {
-      // Fully transparent window: only the glass cards are drawn, floating
-      // straight over the desktop (Windows 10 and 11 alike; macOS below).
-      try {
-        await acrylic.Window.initialize();
-        await acrylic.Window.setEffect(
-          effect: acrylic.WindowEffect.transparent,
-          color: Colors.transparent,
-        );
-        material = GlassWindowMaterial.transparent;
-      } catch (_) {
-        material = GlassWindowMaterial.none;
-      }
+      material = await _initWindows();
     } else if (Platform.isMacOS) {
-      try {
-        final transparent = await glassAppChannel.invokeMethod<bool>(
-          'setWindowTransparent',
-        );
-        material = transparent == true
-            ? GlassWindowMaterial.transparent
-            : GlassWindowMaterial.none;
-      } catch (_) {
-        material = GlassWindowMaterial.none;
-      }
+      material = await _initMacos();
+    } else {
+      // GTK windows here have no alpha visual; readability beats a black rim.
+      material = GlassWindowMaterial.opaque;
     }
     if (GlassPrefs.icon.value != GlassIcon.light) {
       await GlassPrefs.applyIcon();
@@ -95,6 +97,75 @@ class GlassWindow {
       final onTop = prefs.getBool(_alwaysOnTopKey) ?? false;
       alwaysOnTop.value = onTop;
       if (onTop) await windowManager.setAlwaysOnTop(true);
+    } catch (_) {}
+  }
+
+  static Future<GlassWindowMaterial> _initWindows() async {
+    try {
+      await acrylic.Window.initialize();
+    } catch (_) {
+      return GlassWindowMaterial.opaque;
+    }
+    final build = windowsBuildNumber(Platform.operatingSystemVersion);
+    if (build >= 22000) {
+      try {
+        await _applyWindowsBackdrop(build);
+        await windowManager.setWindowCornerPreference(round: true);
+        _windowsBackdrop = true;
+        return GlassWindowMaterial.backdrop;
+      } catch (_) {}
+    }
+    try {
+      await acrylic.Window.setEffect(
+        effect: acrylic.WindowEffect.transparent,
+        color: Colors.transparent,
+      );
+      return GlassWindowMaterial.transparent;
+    } catch (_) {
+      return GlassWindowMaterial.opaque;
+    }
+  }
+
+  /// 22H2 (22523+) blurs through DWM's system backdrop, which stays smooth
+  /// while dragging; 21H2 only offers mica there, legacy acrylic lags.
+  static Future<void> _applyWindowsBackdrop(int build) {
+    return acrylic.Window.setEffect(
+      effect: build >= 22523
+          ? acrylic.WindowEffect.acrylic
+          : acrylic.WindowEffect.mica,
+      dark: glassDark,
+    );
+  }
+
+  static Future<GlassWindowMaterial> _initMacos() async {
+    try {
+      final result = await glassAppChannel.invokeMethod<String>(
+        'setWindowBackdrop',
+        {'dark': glassDark, 'radius': frameRadius},
+      );
+      return switch (result) {
+        'backdrop' => GlassWindowMaterial.backdrop,
+        'transparent' => GlassWindowMaterial.transparent,
+        _ => GlassWindowMaterial.opaque,
+      };
+    } catch (_) {
+      return GlassWindowMaterial.opaque;
+    }
+  }
+
+  static Future<void> syncBackdrop() async {
+    if (glassDemoMode || material != GlassWindowMaterial.backdrop) return;
+    try {
+      if (Platform.isWindows) {
+        await _applyWindowsBackdrop(
+          windowsBuildNumber(Platform.operatingSystemVersion),
+        );
+      } else if (Platform.isMacOS) {
+        await glassAppChannel.invokeMethod<String>('setWindowBackdrop', {
+          'dark': glassDark,
+          'radius': frameRadius,
+        });
+      }
     } catch (_) {}
   }
 
@@ -115,43 +186,42 @@ class GlassWindow {
     } catch (_) {}
   }
 
-  /// Grows or shrinks the window from its top edge, keeping it on screen.
   static Future<void> animateHeight(double target) {
     _desired = target;
     if (_overlays > 0 && target < _overlayMinHeight) {
       target = _overlayMinHeight;
     }
-    return _animateTo(target);
+    return _resizeTo(target);
   }
 
-  static Future<void> _animateTo(
-    double target, {
-    Duration duration = const Duration(milliseconds: 240),
-  }) async {
+  // Stepping the native window size per frame janked (a platform round trip
+  // and relayout each); resize once and animate the panel height instead.
+  static Future<void> _resizeTo(double target) async {
+    final token = ++_resizeToken;
+    if (target >= _height - 0.5) {
+      await _setWindowHeight(target);
+      if (token != _resizeToken) return;
+      frameHeight.value = target;
+      return;
+    }
+    if (animatesFrame) frameHeight.value = target;
+    await Future<void>.delayed(animatesFrame ? frameDuration : _contentFade);
+    if (token != _resizeToken) return;
+    frameHeight.value = target;
+    await _setWindowHeight(target);
+  }
+
+  static Future<void> _setWindowHeight(double target) async {
+    if ((target - _height).abs() < 0.5) return;
     if (glassDemoMode) {
       _height = target;
       return;
     }
-    final token = ++_resizeToken;
-    final start = _height;
-    if ((target - start).abs() < 1) return;
     try {
-      if (target > start) await _ensureRoomBelow(target);
-      const steps = 12;
-      for (var i = 1; i <= steps; i++) {
-        if (token != _resizeToken) return;
-        final t = Curves.easeOutCubic.transform(i / steps);
-        final h = ui.lerpDouble(start, target, t)!;
-        await windowManager.setSize(Size(glassWidgetWidth, h.roundToDouble()));
-        _height = h;
-        await Future<void>.delayed(
-          Duration(milliseconds: duration.inMilliseconds ~/ steps),
-        );
-      }
-      _height = target;
-    } catch (_) {
-      _height = target;
-    }
+      if (target > _height) await _ensureRoomBelow(target);
+      await windowManager.setSize(Size(glassWidgetWidth, target));
+    } catch (_) {}
+    _height = target;
   }
 
   static Future<void> _ensureRoomBelow(double target) async {
@@ -173,9 +243,12 @@ class GlassWindow {
   }
 }
 
-/// The window itself stays invisible so the glass cards float over the
-/// desktop. Where per-pixel transparency is unavailable (e.g. Linux), a light
-/// frosted panel keeps the gaps from turning black.
+int windowsBuildNumber(String version) {
+  final match = RegExp(r'Build (\d+)').firstMatch(version);
+  return match == null ? 0 : int.parse(match.group(1)!);
+}
+
+/// Scrim behind the cards so the desktop never competes with the text.
 class GlassWindowFrame extends StatelessWidget {
   const GlassWindowFrame({super.key, required this.child});
 
@@ -183,25 +256,67 @@ class GlassWindowFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (glassDemoMode ||
-        GlassWindow.material == GlassWindowMaterial.transparent) {
-      return child;
-    }
-    const radius = 26.0;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: Stack(
+    final content = RepaintBoundary(child: child);
+    if (GlassWindow.effectiveMaterial == GlassWindowMaterial.opaque) {
+      return Stack(
         fit: StackFit.expand,
-        children: [
-          const GlassBackground(),
-          CustomPaint(
-            foregroundPainter: GlassRimPainter(radius: radius),
-            child: child,
+        children: [const GlassBackground(), content],
+      );
+    }
+    final radius = GlassWindow.frameRadius;
+    final scrim = RepaintBoundary(
+      child: CustomPaint(
+        foregroundPainter: radius > 0 ? GlassRimPainter(radius: radius) : null,
+        child: GlassBackground(opacity: GlassWindow.scrimOpacity),
+      ),
+    );
+    return ValueListenableBuilder<double>(
+      valueListenable: GlassWindow.frameHeight,
+      builder: (context, height, _) => TweenAnimationBuilder<double>(
+        tween: Tween(end: height),
+        duration: GlassWindow.animatesFrame
+            ? GlassWindow.frameDuration
+            : Duration.zero,
+        curve: Curves.easeOutCubic,
+        builder: (context, visible, _) => ClipRRect(
+          clipper: _PanelClipper(visible, radius),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: visible,
+                child: scrim,
+              ),
+              content,
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
+}
+
+class _PanelClipper extends CustomClipper<RRect> {
+  _PanelClipper(this.height, this.radius);
+
+  final double height;
+  final double radius;
+
+  @override
+  RRect getClip(Size size) => RRect.fromLTRBR(
+    0,
+    0,
+    size.width,
+    height.clamp(0, size.height),
+    Radius.circular(radius),
+  );
+
+  @override
+  bool shouldReclip(_PanelClipper oldClipper) =>
+      oldClipper.height != height || oldClipper.radius != radius;
 }
 
 /// Grows the collapsed widget while a dialog or sheet is up so it has room.

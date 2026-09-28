@@ -6,12 +6,13 @@ import LaunchAtLogin
 class MainFlutterWindow: NSWindow {
     override func awakeFromNib() {
         let flutterViewController = FlutterViewController()
-        // FlutterView paints black by default; Veil draws floating glass cards
-        // over a see-through window, as it does on Windows.
+        // FlutterView paints black by default; Veil draws its glass panel over
+        // a see-through window, blurred by the backdrop view underneath.
         flutterViewController.backgroundColor = .clear
         self.backgroundColor = .clear
         let windowFrame = self.frame
-        self.contentViewController = flutterViewController
+        let backdropController = BackdropViewController(flutterViewController: flutterViewController)
+        self.contentViewController = backdropController
         self.setFrame(windowFrame, display: true)
         
         FlutterMethodChannel(
@@ -36,16 +37,21 @@ class MainFlutterWindow: NSWindow {
         )
         .setMethodCallHandler { [weak self] (_ call: FlutterMethodCall, result: @escaping FlutterResult) in
             switch call.method {
-            case "setWindowTransparent":
+            case "setWindowBackdrop":
                 // window_manager's setAsFrameless marks the window opaque again.
                 guard let window = self else {
-                    result(false)
+                    result("opaque")
                     return
                 }
+                let args = call.arguments as? [String: Any]
                 window.isOpaque = false
                 window.backgroundColor = .clear
                 window.hasShadow = false
-                result(true)
+                backdropController.applyBackdrop(
+                    dark: args?["dark"] as? Bool ?? false,
+                    radius: CGFloat(args?["radius"] as? Double ?? 26)
+                )
+                result("backdrop")
             case "setDockIcon":
                 let path = (call.arguments as? [String: Any])?["path"] as? String
                 NSApp.applicationIconImage = path.flatMap { NSImage(contentsOfFile: $0) }
@@ -61,5 +67,59 @@ class MainFlutterWindow: NSWindow {
     override public func order(_ place: NSWindow.OrderingMode, relativeTo otherWin: Int) {
         super.order(place, relativeTo: otherWin)
         hiddenWindowAtLaunch()
+    }
+}
+
+class BackdropViewController: NSViewController {
+    let flutterViewController: FlutterViewController
+    private let effectView = NSVisualEffectView()
+
+    init(flutterViewController: FlutterViewController) {
+        self.flutterViewController = flutterViewController
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is not supported")
+    }
+
+    override func loadView() {
+        let container = NSView()
+        container.wantsLayer = true
+        effectView.autoresizingMask = [.width, .height]
+        effectView.blendingMode = .behindWindow
+        effectView.material = .popover
+        // A floating widget is usually not the key window; keep it frosted.
+        effectView.state = .active
+        effectView.isHidden = true
+        container.addSubview(effectView)
+        self.view = container
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        addChild(flutterViewController)
+        flutterViewController.view.frame = view.bounds
+        flutterViewController.view.autoresizingMask = [.width, .height]
+        effectView.frame = view.bounds
+        view.addSubview(flutterViewController.view, positioned: .above, relativeTo: effectView)
+    }
+
+    func applyBackdrop(dark: Bool, radius: CGFloat) {
+        effectView.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        effectView.maskImage = radius > 0 ? Self.roundedMask(radius: radius) : nil
+        effectView.isHidden = false
+    }
+
+    private static func roundedMask(radius: CGFloat) -> NSImage {
+        let edge = radius * 2 + 1
+        let image = NSImage(size: NSSize(width: edge, height: edge), flipped: false) { rect in
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+            return true
+        }
+        image.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
+        image.resizingMode = .stretch
+        return image
     }
 }

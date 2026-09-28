@@ -69,7 +69,6 @@ class _DesktopGlassHomeState extends ConsumerState<DesktopGlassHome> {
       if (mounted) setState(() => _panel = panel);
     } else {
       setState(() => _panel = panel);
-      await Future<void>.delayed(const Duration(milliseconds: 160));
       await GlassWindow.animateHeight(_heightFor(panel));
     }
   }
@@ -88,7 +87,6 @@ class _DesktopGlassHomeState extends ConsumerState<DesktopGlassHome> {
   Widget build(BuildContext context) {
     final state = ref.watch(glassProxyStateProvider);
     final running = ref.watch(isStartProvider);
-    final speed = ref.watch(glassSpeedProvider);
     final hasProfile = ref.watch(
       currentProfileProvider.select((p) => p != null),
     );
@@ -124,12 +122,7 @@ class _DesktopGlassHomeState extends ConsumerState<DesktopGlassHome> {
                       Expanded(
                         child: Column(
                           children: [
-                            SpeedBar(
-                              up: speed.up,
-                              down: speed.down,
-                              height: 64,
-                              fontSize: 19,
-                            ),
+                            const LiveSpeedBar(height: 64, fontSize: 19),
                             const SizedBox(height: 12),
                             Expanded(
                               child: Row(

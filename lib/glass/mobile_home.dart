@@ -128,7 +128,6 @@ class _MobileGlassHomeState extends ConsumerState<MobileGlassHome> {
   Widget build(BuildContext context) {
     final state = ref.watch(glassProxyStateProvider);
     final running = ref.watch(isStartProvider);
-    final speed = ref.watch(glassSpeedProvider);
     final hasProfile = ref.watch(
       currentProfileProvider.select((p) => p != null),
     );
@@ -159,179 +158,179 @@ class _MobileGlassHomeState extends ConsumerState<MobileGlassHome> {
       },
       child: Scaffold(
         backgroundColor: GlassColors.bgBottom,
-        body: GlassBackground(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final width = constraints.maxWidth;
-              final height = constraints.maxHeight;
-              _viewWidth = width;
-              _mapWidth = width * 1.22;
-              final mapHeight = _mapWidth / mapAspectRatio;
-              const headerHeight = 150.0;
-              final controlsHeight = 84 + 28 + padding.bottom;
-              final normalGap =
-                  ((height -
-                                  padding.top -
-                                  headerHeight -
-                                  mapHeight -
-                                  controlsHeight) /
-                              2 -
-                          16)
-                      .clamp(8.0, 400.0);
-              return Stack(
-                children: [
-                  Column(
-                    children: [
-                      SizedBox(height: padding.top),
-                      SizedBox(
-                        height: headerHeight,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: _switching || !hasProfile
-                              ? null
-                              : _enterSwitch,
-                          child: _Header(
-                            title: title,
-                            caption: caption,
-                            switching: _switching,
+        body: BackdropGroup(
+          child: GlassBackground(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                final height = constraints.maxHeight;
+                _viewWidth = width;
+                _mapWidth = width * 1.22;
+                final mapHeight = _mapWidth / mapAspectRatio;
+                const headerHeight = 150.0;
+                final controlsHeight = 84 + 28 + padding.bottom;
+                final normalGap =
+                    ((height -
+                                    padding.top -
+                                    headerHeight -
+                                    mapHeight -
+                                    controlsHeight) /
+                                2 -
+                            16)
+                        .clamp(8.0, 400.0);
+                return Stack(
+                  children: [
+                    Column(
+                      children: [
+                        SizedBox(height: padding.top),
+                        SizedBox(
+                          height: headerHeight,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: _switching || !hasProfile
+                                ? null
+                                : _enterSwitch,
+                            child: _Header(
+                              title: title,
+                              caption: caption,
+                              switching: _switching,
+                            ),
                           ),
                         ),
-                      ),
-                      AnimatedContainer(
-                        duration: slide,
-                        curve: Curves.easeOutCubic,
-                        height: _switching ? 0 : normalGap,
-                      ),
-                      SizedBox(
-                        height: mapHeight,
-                        child: ListenableBuilder(
-                          listenable: _selection,
-                          builder: (context, _) => SingleChildScrollView(
-                            controller: _mapScroll,
-                            scrollDirection: Axis.horizontal,
-                            physics: const BouncingScrollPhysics(),
-                            child: SizedBox(
-                              width: _mapWidth,
-                              height: mapHeight,
-                              child: WorldDotMap(
-                                markers: state.markers,
-                                selected: _switching
-                                    ? _selection.region
-                                    : state.currentRegion,
-                                onSelect: (key) {
-                                  if (!_switching) {
-                                    if (hasProfile) {
-                                      _enterSwitch();
-                                      _selection.pickRegion(state, key);
+                        AnimatedContainer(
+                          duration: slide,
+                          curve: Curves.easeOutCubic,
+                          height: _switching ? 0 : normalGap,
+                        ),
+                        SizedBox(
+                          height: mapHeight,
+                          child: ListenableBuilder(
+                            listenable: _selection,
+                            builder: (context, _) => SingleChildScrollView(
+                              controller: _mapScroll,
+                              scrollDirection: Axis.horizontal,
+                              physics: const BouncingScrollPhysics(),
+                              child: SizedBox(
+                                width: _mapWidth,
+                                height: mapHeight,
+                                child: WorldDotMap(
+                                  markers: state.markers,
+                                  selected: _switching
+                                      ? _selection.region
+                                      : state.currentRegion,
+                                  onSelect: (key) {
+                                    if (!_switching) {
+                                      if (hasProfile) {
+                                        _enterSwitch();
+                                        _selection.pickRegion(state, key);
+                                      }
+                                      return;
                                     }
-                                    return;
-                                  }
-                                  _selection.pickRegion(state, key);
-                                },
+                                    _selection.pickRegion(state, key);
+                                  },
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      Expanded(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 300),
-                          transitionBuilder: (child, animation) =>
-                              FadeTransition(
-                                opacity: animation,
-                                child: SlideTransition(
-                                  position: Tween(
-                                    begin: const Offset(0, 0.06),
-                                    end: Offset.zero,
-                                  ).animate(animation),
-                                  child: child,
-                                ),
-                              ),
-                          child: _switching
-                              ? _SwitchPanel(
-                                  key: const ValueKey('switch'),
-                                  selection: _selection,
-                                  state: state,
-                                  saving: _saving,
-                                  onSave: _save,
-                                  bottomPadding: padding.bottom,
-                                )
-                              : _NodePill(
-                                  key: const ValueKey('normal'),
-                                  state: state,
-                                  visible:
-                                      hasProfile &&
-                                      state.mode != Mode.direct &&
-                                      state.currentNode != null,
-                                  onTap: _enterSwitch,
-                                ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Positioned(
-                    top: padding.top + 12,
-                    right: 16,
-                    child: AnimatedSlide(
-                      duration: slide,
-                      curve: Curves.easeInOutCubic,
-                      offset: _switching ? const Offset(2.2, 0) : Offset.zero,
-                      child: GlassIconButton(
-                        icon: Icons.settings_rounded,
-                        size: 48,
-                        radius: 16,
-                        iconSize: 24,
-                        tooltip: strings.settings,
-                        onTap: _openSettings,
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    bottom: padding.bottom + 28,
-                    child: AnimatedSlide(
-                      duration: slide,
-                      curve: Curves.easeInOutCubic,
-                      offset: _switching ? const Offset(0, 2.4) : Offset.zero,
-                      child: AnimatedOpacity(
-                        duration: slide,
-                        opacity: _switching ? 0 : 1,
-                        child: IgnorePointer(
-                          ignoring: _switching,
-                          child: SizedBox(
-                            height: 84,
-                            child: Row(
-                              children: [
-                                GlassPlayButton(
-                                  running: running,
-                                  size: 84,
-                                  radius: 26,
-                                  onTap: hasProfile
-                                      ? ref
-                                            .read(glassBackendProvider)
-                                            .toggleRunning
-                                      : _openSettings,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: SpeedBar(
-                                    up: speed.up,
-                                    down: speed.down,
-                                    height: 84,
-                                    fontSize: 17,
+                        Expanded(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            transitionBuilder: (child, animation) =>
+                                FadeTransition(
+                                  opacity: animation,
+                                  child: SlideTransition(
+                                    position: Tween(
+                                      begin: const Offset(0, 0.06),
+                                      end: Offset.zero,
+                                    ).animate(animation),
+                                    child: child,
                                   ),
                                 ),
-                              ],
+                            child: _switching
+                                ? _SwitchPanel(
+                                    key: const ValueKey('switch'),
+                                    selection: _selection,
+                                    state: state,
+                                    saving: _saving,
+                                    onSave: _save,
+                                    bottomPadding: padding.bottom,
+                                  )
+                                : _NodePill(
+                                    key: const ValueKey('normal'),
+                                    state: state,
+                                    visible:
+                                        hasProfile &&
+                                        state.mode != Mode.direct &&
+                                        state.currentNode != null,
+                                    onTap: _enterSwitch,
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Positioned(
+                      top: padding.top + 12,
+                      right: 16,
+                      child: AnimatedSlide(
+                        duration: slide,
+                        curve: Curves.easeInOutCubic,
+                        offset: _switching ? const Offset(2.2, 0) : Offset.zero,
+                        child: GlassIconButton(
+                          icon: Icons.settings_rounded,
+                          size: 48,
+                          radius: 16,
+                          iconSize: 24,
+                          tooltip: strings.settings,
+                          onTap: _openSettings,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: padding.bottom + 28,
+                      child: AnimatedSlide(
+                        duration: slide,
+                        curve: Curves.easeInOutCubic,
+                        offset: _switching ? const Offset(0, 2.4) : Offset.zero,
+                        child: AnimatedOpacity(
+                          duration: slide,
+                          opacity: _switching ? 0 : 1,
+                          child: IgnorePointer(
+                            ignoring: _switching,
+                            child: SizedBox(
+                              height: 84,
+                              child: Row(
+                                children: [
+                                  GlassPlayButton(
+                                    running: running,
+                                    size: 84,
+                                    radius: 26,
+                                    onTap: hasProfile
+                                        ? ref
+                                              .read(glassBackendProvider)
+                                              .toggleRunning
+                                        : _openSettings,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Expanded(
+                                    child: LiveSpeedBar(
+                                      height: 84,
+                                      fontSize: 17,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              );
-            },
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ),

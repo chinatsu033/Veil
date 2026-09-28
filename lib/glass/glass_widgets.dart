@@ -70,6 +70,24 @@ void configureGlassForDesktop() {
 
 const glassTabular = [ui.FontFeature.tabularFigures()];
 
+class GlassBlurScope extends InheritedWidget {
+  const GlassBlurScope({
+    super.key,
+    required this.enabled,
+    required super.child,
+  });
+
+  final bool enabled;
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<GlassBlurScope>()?.enabled ??
+      true;
+
+  @override
+  bool updateShouldNotify(GlassBlurScope oldWidget) =>
+      oldWidget.enabled != enabled;
+}
+
 /// Airy pastel backdrop; soft colour blooms keep the frosted blur visible.
 class GlassBackground extends StatelessWidget {
   const GlassBackground({super.key, this.child, this.opacity = 1});
@@ -234,8 +252,9 @@ class GlassSurface extends StatelessWidget {
         ),
       ),
     );
-    if (blur > 0 && glassBlur) {
-      content = BackdropFilter(
+    if (blur > 0 && glassBlur && GlassBlurScope.of(context)) {
+      // Under a [BackdropGroup] all cards share one backdrop read per frame.
+      content = BackdropFilter.grouped(
         filter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur),
         child: content,
       );

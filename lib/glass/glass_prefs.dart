@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'glass_widgets.dart';
+import 'glass_window.dart';
 
 /// Light is the default: dark only when the user picks it (or follows a dark system).
 enum GlassAppearance { light, dark, system }
@@ -123,6 +124,7 @@ class GlassThemeScope extends StatelessWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
     if (dark != glassDark) {
       glassDark = dark;
+      unawaited(GlassWindow.syncBackdrop());
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!context.mounted) return;
         void rebuild(Element element) {
