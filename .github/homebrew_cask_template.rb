@@ -28,12 +28,12 @@ cask "veil" do
                    args: ["-rd", "com.apple.quarantine", "#{appdir}/Veil.app"]
   end
 
-  uninstall quit: "com.follow.clash"
+  uninstall quit: "com.chinatsu.veil"
 
   zap trash: [
-    "~/Library/Application Support/com.follow.clash",
-    "~/Library/Caches/com.follow.clash",
-    "~/Library/Preferences/com.follow.clash.plist",
-    "~/Library/Saved Application State/com.follow.clash.savedState",
+    "~/Library/Application Support/com.chinatsu.veil",
+    "~/Library/Caches/com.chinatsu.veil",
+    "~/Library/Preferences/com.chinatsu.veil.plist",
+    "~/Library/Saved Application State/com.chinatsu.veil.savedState",
   ]
 end
