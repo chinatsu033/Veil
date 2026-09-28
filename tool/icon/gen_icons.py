@@ -18,7 +18,7 @@ from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 from fontTools.varLib import instancer
-from PIL import Image
+from PIL import Image, ImageChops
 
 ROOT = Path(__file__).resolve().parents[2]
 FONT = Path(__file__).with_name("Outfit[wght].ttf")
@@ -130,6 +130,18 @@ def tray_icon(variant, status, size=256):
     return svg(size, body)
 
 
+def tray_template(px, size=256):
+    """macOS menu bar template: a black plate with the V knocked out (alpha only)."""
+    r = size * 0.24
+    plate = png(svg(size, f'<rect x="{size*0.03}" y="{size*0.03}" width="{size*0.94}" '
+                          f'height="{size*0.94}" rx="{r}" fill="#000"/>'), px)
+    glyph = png(svg(size, f'<path d="{MONO.path(size / 2, size / 2, size * 0.5)}" fill="#000"/>'), px)
+    alpha = ImageChops.subtract(plate.getchannel("A"), glyph.getchannel("A"))
+    out = Image.new("RGBA", plate.size, (0, 0, 0, 0))
+    out.putalpha(alpha)
+    return out
+
+
 def save_ico(svg_text, path, sizes):
     images = [png(svg_text, s) for s in sizes]
     big = images[-1]
@@ -239,6 +251,21 @@ def main():
                 write(f"{unix_dir}/{scale}status_{status}.png", buf.getvalue())
         if variant == "light":
             save_ico(icon, ROOT / "windows/runner/resources/app_icon.ico", ico_sizes)
+
+    # macOS: Big Sur icon grid (824px plate on a 1024px canvas), template tray
+    # icons, and Dock icons the in-app icon switcher applies at runtime.
+    appiconset = "macos/Runner/Assets.xcassets/AppIcon.appiconset"
+    mac_inset = (1024 - 824) / 2 / 1024
+    for px in (16, 32, 64, 128, 256, 512, 1024):
+        buf = io.BytesIO(); png(rounded_icon("light", inset=mac_inset, word=0.58), px).save(buf, "PNG")
+        write(f"{appiconset}/app_icon_{px}.png", buf.getvalue())
+    for variant in VARIANTS:
+        suffix = "" if variant == "light" else "_dark"
+        buf = io.BytesIO(); png(rounded_icon(variant, inset=mac_inset, word=0.58), 512).save(buf, "PNG")
+        write(f"assets/images/macos/dock{suffix}.png", buf.getvalue())
+    for scale, px in {"": 18, "2.0x/": 36, "3.0x/": 54, "4.0x/": 72}.items():
+        buf = io.BytesIO(); tray_template(px).save(buf, "PNG")
+        write(f"assets/images/tray/macos/{scale}status_1.png", buf.getvalue())
 
     # Preview sheet and master SVGs for reference.
     for variant in VARIANTS:

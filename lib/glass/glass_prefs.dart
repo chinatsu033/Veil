@@ -17,7 +17,7 @@ enum GlassIcon { light, dark }
 
 const _appearanceKey = 'glass.appearance';
 const _iconKey = 'glass.icon';
-const _appChannel = MethodChannel('com.follow.clash/app');
+const glassAppChannel = MethodChannel('com.follow.clash/app');
 
 abstract final class GlassPrefs {
   static final appearance = ValueNotifier(GlassAppearance.light);
@@ -63,18 +63,21 @@ abstract final class GlassPrefs {
 
   static String get _suffix => icon.value == GlassIcon.dark ? '_dark' : '';
 
-  /// Asset folder of the tray icons for the chosen design.
-  static String trayDir({required bool windows}) =>
-      'assets/images/tray/${windows ? 'windows' : 'unix'}$_suffix';
+  /// Asset folder of the tray icons for the chosen design. The macOS menu
+  /// bar only draws template images, so both designs share one set there.
+  static String trayDir({required bool windows, bool macOS = false}) => macOS
+      ? 'assets/images/tray/macos'
+      : 'assets/images/tray/${windows ? 'windows' : 'unix'}$_suffix';
 
   static String get iconAsset => 'assets/images/icon$_suffix.png';
 
   /// Android swaps the launcher activity-alias; Windows swaps the window and
-  /// taskbar icon (the installed exe/shortcut icon cannot change at runtime).
+  /// taskbar icon and macOS the Dock icon (the installed exe/app bundle icon
+  /// cannot change at runtime).
   static Future<void> applyIcon() async {
     try {
       if (Platform.isAndroid) {
-        await _appChannel.invokeMethod<bool>('setLauncherIcon', {
+        await glassAppChannel.invokeMethod<bool>('setLauncherIcon', {
           'icon': icon.value.name,
         });
       } else if (Platform.isWindows) {
@@ -86,6 +89,23 @@ abstract final class GlassPrefs {
         await windowManager.setIcon(
           p.join(assets, 'assets', 'images', 'icon$_suffix.ico'),
         );
+      } else if (Platform.isMacOS) {
+        final assets = p.join(
+          p.dirname(p.dirname(Platform.resolvedExecutable)),
+          'Frameworks',
+          'App.framework',
+          'Resources',
+          'flutter_assets',
+        );
+        await glassAppChannel.invokeMethod<bool>('setDockIcon', {
+          'path': p.join(
+            assets,
+            'assets',
+            'images',
+            'macos',
+            'dock$_suffix.png',
+          ),
+        });
       }
     } catch (_) {}
   }

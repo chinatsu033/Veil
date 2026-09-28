@@ -8,7 +8,7 @@
 PRODUCT_NAME = Veil
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.follow.clash
+PRODUCT_BUNDLE_IDENTIFIER = com.chinatsu.veil
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2023 com.follow. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 chinatsu033. Based on FlClash by chen08209. GPL-3.0.

@@ -45,7 +45,7 @@ class AppTray implements TrayPort {
   }
 
   String get _trayIconDir {
-    return GlassPrefs.trayDir(windows: isWindows);
+    return GlassPrefs.trayDir(windows: isWindows, macOS: isMacOS);
   }
 
   String getTrayIcon({required bool isStart, required bool tunEnable}) {

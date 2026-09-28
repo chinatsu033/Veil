@@ -111,9 +111,13 @@ flutter:
     - assets/images/avatar/
     - assets/images/empty/
     - path: assets/images/tray/unix/
-      platforms: [ macos, linux ]
+      platforms: [ linux ]
     - path: assets/images/tray/unix_dark/
-      platforms: [ macos, linux ]
+      platforms: [ linux ]
+    - path: assets/images/tray/macos/
+      platforms: [ macos ]
+    - path: assets/images/macos/
+      platforms: [ macos ]
     - path: assets/images/tray/windows/
       platforms: [ windows ]
     - path: assets/images/tray/windows_dark/

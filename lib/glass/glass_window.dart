@@ -64,7 +64,7 @@ class GlassWindow {
     } catch (_) {}
     if (Platform.isWindows) {
       // Fully transparent window: only the glass cards are drawn, floating
-      // straight over the desktop (Windows 10 and 11 alike).
+      // straight over the desktop (Windows 10 and 11 alike; macOS below).
       try {
         await acrylic.Window.initialize();
         await acrylic.Window.setEffect(
@@ -72,6 +72,17 @@ class GlassWindow {
           color: Colors.transparent,
         );
         material = GlassWindowMaterial.transparent;
+      } catch (_) {
+        material = GlassWindowMaterial.none;
+      }
+    } else if (Platform.isMacOS) {
+      try {
+        final transparent = await glassAppChannel.invokeMethod<bool>(
+          'setWindowTransparent',
+        );
+        material = transparent == true
+            ? GlassWindowMaterial.transparent
+            : GlassWindowMaterial.none;
       } catch (_) {
         material = GlassWindowMaterial.none;
       }

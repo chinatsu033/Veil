@@ -45,7 +45,7 @@ void main() {
       ]) {
         expect(
           macOS.getTrayIcon(isStart: isStart, tunEnable: tunEnable),
-          'assets/images/tray/unix/status_1.png',
+          'assets/images/tray/macos/status_1.png',
         );
       }
     });
