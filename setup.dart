@@ -172,7 +172,7 @@ Future<int> _package(
   );
   final descriptionArgs = <String>[];
   if (platform != 'android') {
-    descriptionArgs.addAll(['--description', arch]);
+    descriptionArgs.addAll(['--description', artifactArch(arch)]);
   }
 
   final depExit = await _ensureDependencies(platform);
@@ -221,7 +221,33 @@ Future<int> _package(
     stderr.write(utf8.decode(data));
   });
   final exitCode = await process.exitCode;
+  if (exitCode == 0) _normalizeArtifactNames(p.join(rootDir, 'dist'));
   return exitCode;
+}
+
+/// Release assets call the Intel/AMD architecture `x86`; ARM names are kept.
+String artifactArch(String arch) {
+  return const {'amd64', 'x86_64', 'x64'}.contains(arch) ? 'x86' : arch;
+}
+
+String normalizeArtifactName(String name) {
+  return name.replaceAllMapped(
+    RegExp(r'-(amd64|x86_64|x64)(?=[-.])'),
+    (_) => '-x86',
+  );
+}
+
+void _normalizeArtifactNames(String dist) {
+  final dir = Directory(dist);
+  if (!dir.existsSync()) return;
+  for (final file in dir.listSync().whereType<File>()) {
+    final name = p.basename(file.path);
+    final normalized = normalizeArtifactName(name);
+    if (normalized != name) {
+      file.renameSync(p.join(dist, normalized));
+      stdout.writeln('Renamed $name -> $normalized');
+    }
+  }
 }
 
 String _detectArch() {
@@ -321,19 +347,33 @@ Future<int> _ensureLinuxDependencies() async {
     return 0;
   }
   stdout.writeln('Downloading appimagetool...');
-  final downloadName =
-      'appimagetool-${appImageToolArch(_detectArch())}.AppImage';
-  final dlResult = await Process.run('wget', [
+  final toolArch = appImageToolArch(_detectArch());
+  final tool = '/usr/local/bin/appimagetool-$toolArch.AppImage';
+  final dlExit = await _runLinuxDependencyCommand([
+    'wget',
+    '-q',
     '-O',
-    appimagetool,
-    'https://github.com/AppImage/AppImageKit/releases/download/continuous/$downloadName',
+    tool,
+    'https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-$toolArch.AppImage',
   ]);
-  if (dlResult.exitCode != 0) {
-    stderr.write(dlResult.stderr);
-    return dlResult.exitCode;
+  if (dlExit != 0) return dlExit;
+  final wrapper = File(p.join(Directory.systemTemp.path, 'appimagetool'));
+  await wrapper.writeAsString(appImageToolWrapper(tool, toolArch));
+  for (final command in [
+    ['install', '-m', '755', wrapper.path, appimagetool],
+    ['chmod', '+x', tool],
+  ]) {
+    final exitCode = await _runLinuxDependencyCommand(command);
+    if (exitCode != 0) return exitCode;
   }
-  await Process.run('chmod', ['+x', appimagetool]);
   return 0;
+}
+
+/// flutter_distributor hardcodes `ARCH=x86_64`, wrong for arm64 AppImages.
+String appImageToolWrapper(String tool, String arch) {
+  return '#!/bin/sh\n'
+      'export ARCH=$arch APPIMAGE_EXTRACT_AND_RUN=1\n'
+      'exec "$tool" "\$@"\n';
 }
 
 String appImageToolArch(String arch) {

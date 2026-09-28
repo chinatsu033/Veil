@@ -1,8 +1,8 @@
 display_name: Veil
-package_name: Veil
+package_name: veil
 maintainer:
-  name: chen08209
-  email: chen08209@gmail.com
+  name: chinatsu033
+  email: chinatsu033@users.noreply.github.com
 
 priority: optional
 section: x11
@@ -39,3 +39,5 @@ categories:
   - Network
 
 startup_notify: true
+
+startup_wm_class: com.chinatsu.veil
